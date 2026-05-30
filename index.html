@@ -117,8 +117,10 @@ const clean = v => {
   return v.replace(/[Bs$,%\s]/g,"").replace(/,/g,"");
 };
 const toNum = v => { const n=parseFloat(clean(v)); return isNaN(n)?null:n; };
-const fmt = (v,cur) => {
+const fmt = (v,cur,type="default") => {
   if (v===null||v===undefined||isNaN(v)||v===0) return "—";
+  if (type==="ratio") return `${cur}${parseFloat(v.toFixed(2)).toLocaleString()}`;
+  if (type==="full")  return `${cur}${v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   if (v>=1000000) return `${cur}${(v/1000000).toFixed(1)}M`;
   if (v>=1000)    return `${cur}${(v/1000).toFixed(0)}K`;
   return `${cur}${parseFloat(v.toFixed(2)).toLocaleString()}`;
@@ -285,14 +287,14 @@ function renderMain() {
   // KPIs
   html+=`<div class="section-label">Resumen — ${selPeriod.toUpperCase()}${periodMode==="q"?" (Trimestre)":""}</div><div class="kpis">`;
   const kpis=[
-    agg.invertido>0 ? {label:"Invertido",value:fmt(agg.invertido,cur)} : null,
+    agg.invertido>0 ? {label:"Invertido",value:fmt(agg.invertido,cur,"full")} : null,
     agg.leads>0 ? {label:"Leads",value:agg.leads.toLocaleString()} : null,
-    agg.cpl>0 ? {label:"CPL",value:`${cur}${agg.cpl}`,meta:agg.metaCPL,good:"low",cur} : null,
+    agg.cpl>0 ? {label:"CPL",value:`${cur}${parseFloat(agg.cpl.toFixed(2))}`,meta:agg.metaCPL!=null?parseFloat(agg.metaCPL.toFixed(2)):null,good:"low",cur} : null,
     agg.agendamientos>0 ? {label:"Agendamientos",value:agg.agendamientos,meta:agg.metaAgend,good:"high"} : null,
     agg.seguidores>0 ? {label:"Seguidores",value:agg.seguidores,meta:agg.metaSeg,good:"high"} : null,
     (agg.cierres>0||agg.metaCierres>0) ? {label:cfg.funnelKeys.find(f=>f.key==="cierres")?.label||"Cierres",value:agg.cierres??0,meta:agg.metaCierres,good:"high"} : null,
-    agg.facturacion>0 ? {label:"Facturación",value:fmt(agg.facturacion,cur)} : null,
-    agg.roas>0 ? {label:"ROAS",value:`${agg.roas}x`,meta:agg.metaROAS!=null?`${agg.metaROAS}x`:null,good:"high"} : null,
+    agg.facturacion>0 ? {label:"Facturación",value:fmt(agg.facturacion,cur,"full")} : null,
+    agg.roas>0 ? {label:"ROAS",value:`${parseFloat(agg.roas.toFixed(2))}x`,meta:agg.metaROAS!=null?`${parseFloat(agg.metaROAS.toFixed(2))}x`:null,good:"high"} : null,
   ].filter(Boolean);
   kpis.forEach(k=>{
     const nV=parseFloat(k.value),nM=parseFloat(k.meta);
@@ -302,8 +304,14 @@ function renderMain() {
   });
   html+=`</div>`;
 
-  // Funnel
-  const fItems=cfg.funnelKeys.map(f=>({...f,value:agg[f.key]??0})).filter(i=>i.value>0);
+  // Funnel — todas las métricas disponibles con valor > 0
+  const ALL_FUNNEL_KEYS = [
+    {key:"leads",       label:"Leads / Registros", icon:"👥"},
+    {key:"seguidores",  label:"Seguidores",         icon:"📣"},
+    {key:"agendamientos",label:"Agendamientos",     icon:"📅"},
+    {key:"cierres",     label: cfg.funnelKeys.find(f=>f.key==="cierres")?.label || "Cierres / Ventas", icon:"🤝"},
+  ];
+  const fItems = ALL_FUNNEL_KEYS.map(f=>({...f, value: agg[f.key]??0})).filter(i=>i.value>0);
   const fMax=Math.max(...fItems.map(i=>i.value),1);
   html+=`<div class="card"><div class="section-label" style="margin-top:0">Embudo — ${selPeriod.toUpperCase()}</div>`;
   if (!fItems.length) {
